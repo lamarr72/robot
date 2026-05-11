@@ -20,5 +20,25 @@ public class GameWindow extends JInternalFrame
         panel.add(m_visualizer, BorderLayout.CENTER);
         getContentPane().add(panel);
         pack();
+
+        setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
+
+        this.addInternalFrameListener(new javax.swing.event.InternalFrameAdapter() {
+            @Override
+            public void internalFrameClosing(javax.swing.event.InternalFrameEvent e) {
+                Object[] options = {"Да", "Нет"};
+                int n = javax.swing.JOptionPane.showOptionDialog(GameWindow.this,
+                    "Закрыть игровое поле?",
+                    "Подтверждение",
+                    javax.swing.JOptionPane.YES_NO_OPTION,
+                    javax.swing.JOptionPane.QUESTION_MESSAGE,
+                    null, options, options[0]);
+            
+                 if (n == 0) {
+                    dispose();
+                }
+            }
+        });
+        pack();
     }
 }

@@ -43,7 +43,15 @@ public class MainApplicationFrame extends JFrame
         setJMenuBar((generateMenuBar()));
 
         ///операция при закрытии
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
+
+        ///добавление слушателя закрытия окна
+        addWindowListener(new java.awt.event.WindowAdapter() {
+            @Override
+            public void windowClosing(java.awt.event.WindowEvent e) {
+                confirmExit();
+            }
+        });
     }
     
     /**
@@ -96,7 +104,6 @@ public class MainApplicationFrame extends JFrame
 
     /**
      * Создает меню управления внешним видом.
-     * 
      */
     private JMenu createLookAndFeelMenu() {
         JMenu lookAndFeelMenu = new JMenu("Режим отображения");
@@ -120,6 +127,20 @@ public class MainApplicationFrame extends JFrame
         return testMenu;
     } 
 
+    private void confirmExit() {
+        Object[] options = {"Да", "Нет"};;
+        int n = javax.swing.JOptionPane.showOptionDialog(this,
+            "Вы действительно хотите выйти?",
+            "Подтверждение выхода",
+            javax.swing.JOptionPane.YES_NO_OPTION,
+            javax.swing.JOptionPane.QUESTION_MESSAGE,
+            null, options, options[0]
+        );
+        if (n == 0) {
+            System.exit(0);
+        }
+    }
+
     /**
      * Создает меню выхода.
      * + подтверждение выхода.
@@ -127,20 +148,8 @@ public class MainApplicationFrame extends JFrame
     private JMenu createExitMenu() {
         JMenu exitMenu = new JMenu("Файл");
         exitMenu.setMnemonic(KeyEvent.VK_F);
-
-        exitMenu.add(createMenuItem("Выход", KeyEvent.VK_X, () -> {
-            Object[] options = {"Да", "Нет"};
-            int n = javax.swing.JOptionPane.showOptionDialog(this,
-                "Вы действиетльно хотите выйти?", 
-                "Подтвреждение", 
-                javax.swing.JOptionPane.YES_NO_OPTION,
-                javax.swing.JOptionPane.QUESTION_MESSAGE,
-                null,
-                options,
-                options[0]);
-            if (n==0) System.exit(0);
-        }));
-
+        //использует общий метод confirmExit
+        exitMenu.add(createMenuItem("Выход", KeyEvent.VK_X, this::confirmExit));
         return exitMenu;
     }
 
