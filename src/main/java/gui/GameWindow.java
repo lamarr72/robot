@@ -6,8 +6,8 @@ import javax.swing.JInternalFrame;
 import javax.swing.JPanel;
 
 /**
- * внутреннее окно (JInternalFrame) для кигрового пола. 
- * Содержит GameVisualizer и зазмещается на рабочем столе главоного фрейма.
+ * внутреннее окно ({@link JInternalFrame}) для игрового пола. 
+ * Содержит {@link GameVisualizer} и зазмещается на рабочем столе главоного фрейма.
  */
 public class GameWindow extends JInternalFrame
 {

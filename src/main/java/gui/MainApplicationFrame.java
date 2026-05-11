@@ -16,11 +16,10 @@ import javax.swing.UnsupportedLookAndFeelException;
 
 import log.Logger;
 
-/**
- * Что требуется сделать:
- * 1. Метод создания меню перегружен функционалом и трудно читается. 
- * Следует разделить его на серию более простых методов (или вообще выделить отдельный класс).
- *
+/** 
+ * Главный класс приложения. <br>
+ * Создает главное окно ({@link JFrame} с рабочим столом ({@link JDesktopPane}), на котором размещаются внутренние онкна. <br>
+ * Добавляет окно логов ({@link LogWindow}) и игровое окно ({@link GameWindow}).
  */
 public class MainApplicationFrame extends JFrame
 {
