@@ -16,10 +16,8 @@ import javax.swing.UnsupportedLookAndFeelException;
 
 import log.Logger;
 
-/** 
- * Главный класс приложения. <br>
- * Создает главное окно ({@link JFrame} с рабочим столом ({@link JDesktopPane}), на котором размещаются внутренние онкна. <br>
- * Добавляет окно логов ({@link LogWindow}) и игровое окно ({@link GameWindow}).
+/**
+ * Главный класс приложения.
  */
 public class MainApplicationFrame extends JFrame
 {
@@ -42,14 +40,14 @@ public class MainApplicationFrame extends JFrame
         ///установка меню
         setJMenuBar((generateMenuBar()));
 
-        ///операция при закрытии
+        ///Запрещаем Swing закрывать приложение автоматически
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
 
-        ///добавление слушателя закрытия окна
+        //Вешаем слушатель на крестик главного окна (исправлена скобка)
         addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
             public void windowClosing(java.awt.event.WindowEvent e) {
-                confirmExit();
+                confirmExit(); // Вызываем единый метод подтверждения
             }
         });
     }
@@ -68,7 +66,7 @@ public class MainApplicationFrame extends JFrame
     }
     
     /**
-     * Создает игровое окно ///
+     * Создает игровое окно
      */
     protected GameWindow createGameWindow() {
         GameWindow gameWindow = new GameWindow();
@@ -88,9 +86,7 @@ public class MainApplicationFrame extends JFrame
 
     /**
      * Основной метод генерации меню.
-     * Собирает меню из отдельных частей
      */
-        
     private JMenuBar generateMenuBar()
     {
         JMenuBar menuBar = new JMenuBar();
@@ -109,7 +105,7 @@ public class MainApplicationFrame extends JFrame
         JMenu lookAndFeelMenu = new JMenu("Режим отображения");
         lookAndFeelMenu.setMnemonic(KeyEvent.VK_V);
 
-        lookAndFeelMenu.add(createMenuItem("Систменая схема", KeyEvent.VK_S, () -> setLookAndFeel(UIManager.getSystemLookAndFeelClassName())));
+        lookAndFeelMenu.add(createMenuItem("Системная схема", KeyEvent.VK_S, () -> setLookAndFeel(UIManager.getSystemLookAndFeelClassName())));
         lookAndFeelMenu.add(createMenuItem("Универсальная схема", KeyEvent.VK_U, () -> setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName())));
 
         return lookAndFeelMenu;
@@ -127,15 +123,18 @@ public class MainApplicationFrame extends JFrame
         return testMenu;
     } 
 
+    /**
+     * Единый метод подтверждения выхода для крестика и меню.
+     */
     private void confirmExit() {
-        Object[] options = {"Да", "Нет"};;
+        Object[] options = {"Да", "Нет"};
         int n = javax.swing.JOptionPane.showOptionDialog(this,
-            "Вы действительно хотите выйти?",
-            "Подтверждение выхода",
+            "Вы действительно хотите выйти?", 
+            "Подтверждение выхода", 
             javax.swing.JOptionPane.YES_NO_OPTION,
             javax.swing.JOptionPane.QUESTION_MESSAGE,
-            null, options, options[0]
-        );
+            null, options, options[0]);
+        
         if (n == 0) {
             System.exit(0);
         }
@@ -143,19 +142,19 @@ public class MainApplicationFrame extends JFrame
 
     /**
      * Создает меню выхода.
-     * + подтверждение выхода.
      */
     private JMenu createExitMenu() {
         JMenu exitMenu = new JMenu("Файл");
         exitMenu.setMnemonic(KeyEvent.VK_F);
-        //использует общий метод confirmExit
+
+        // Используем ссылку на наш единый метод confirmExit
         exitMenu.add(createMenuItem("Выход", KeyEvent.VK_X, this::confirmExit));
+
         return exitMenu;
     }
 
     /**
      * Вспомогательный метод для создания пунктов меню.
-     * Убирает дублирование кода addActionListener и создания объектов.
      */
     private JMenuItem createMenuItem(String text, int mnemonic, Runnable action) {
         JMenuItem item = new JMenuItem(text, mnemonic);
@@ -167,7 +166,7 @@ public class MainApplicationFrame extends JFrame
     }
 
     /**
-     * Устанавливает LookAndFell и обновляет UI всех компонентов.
+     * Устанавливает LookAndFeel и обновляет UI всех компонентов.
      */
     private void setLookAndFeel(String className)
     {
@@ -178,7 +177,6 @@ public class MainApplicationFrame extends JFrame
         }
         catch (ClassNotFoundException | InstantiationException
             | IllegalAccessException | UnsupportedLookAndFeelException e) {
-            ///
             Logger.error("Ошибка смены темы: " + e.getMessage());
         }
     }

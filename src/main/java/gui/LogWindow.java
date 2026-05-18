@@ -4,7 +4,6 @@ import java.awt.BorderLayout;
 import java.awt.EventQueue;
 import java.awt.TextArea;
 
-import javax.swing.JInternalFrame;
 import javax.swing.JPanel;
 
 import log.LogChangeListener;
@@ -12,17 +11,16 @@ import log.LogEntry;
 import log.LogWindowSource;
 
 /**
- * Внутреннее окно для отображения логов. <br>
- * Использует {@link TextArea} для показа сообщений из {@link LogWindowSource}.<br>
- * Реализует интерфейс {@link LogChangeListener} для автоматического обновления при добавлении новых логов.
+ * Внутреннее окно для отображения логов.
  */
-public class LogWindow extends JInternalFrame implements LogChangeListener
+public class LogWindow extends BaseInternalFrame implements LogChangeListener
 {
     private LogWindowSource m_logSource;
     private TextArea m_logContent;
 
     public LogWindow(LogWindowSource logSource) 
     {
+        //вызов конструктора базового класса BaseInternalFrame
         super("Протокол работы", true, true, true, true);
         m_logSource = logSource;
         m_logSource.registerListener(this);
@@ -34,27 +32,15 @@ public class LogWindow extends JInternalFrame implements LogChangeListener
         getContentPane().add(panel);
         pack();
         updateLogContent();
+    }
 
-        ///
-        setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
-        
-        ///добавление слоушателя событий окна
-        this.addInternalFrameListener(new javax.swing.event.InternalFrameAdapter() {
-            @Override
-            public void internalFrameClosing(javax.swing.event.InternalFrameEvent e) {
-                Object[] options = {"Да", "Нет"};
-                int n = javax.swing.JOptionPane.showOptionDialog((LogWindow.this),
-                    "Закрыть окно протокола?",
-                    "Подтверждение", 
-                    javax.swing.JOptionPane.YES_NO_OPTION,
-                    javax.swing.JOptionPane.QUESTION_MESSAGE, 
-                    null, options, options[0]);
-                if (n == 0) {
-                    m_logSource.unregisterListener(LogWindow.this);
-                    dispose();
-                }
-            }
-        });
+    /**
+     * Переопределение метода-крючока из BaseInternalFrame.
+     * Отработает только когда пользователь нажал "Да".
+     */
+    @Override
+    protected void beforeClose() {
+        m_logSource.unregisterListener(this);
     }
 
     private void updateLogContent()
