@@ -222,4 +222,19 @@ public class GameVisualizer extends JPanel //панель для визуали�
         g.setColor(Color.BLACK);
         drawOval(g, x, y, 5, 5);
     }
+
+    //для тестов
+    protected void setRobotPositionForTest(double x, double y, double direction) {
+        m_robotPositionX = x;
+        m_robotPositionY = y;
+        m_robotDirection = direction;
+    }
+    
+    protected double getRobotPositionX() {
+        return m_robotPositionX;
+    }
+    
+    protected double getRobotPositionY() {
+        return m_robotPositionY;
+    }
 }

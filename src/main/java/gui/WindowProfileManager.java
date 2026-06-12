@@ -13,7 +13,7 @@ import log.Logger;
  */
 public class WindowProfileManager {
     
-    //файл конфигурации в домашней папке 
+    //файл конфигурации в юзер папке 
     private static final File PROFILE_FILE = new File(System.getProperty("user.home"), ".robots_profile");
     private final Properties properties = new Properties();
 
@@ -32,10 +32,19 @@ public class WindowProfileManager {
      * Извлечение состояния окна и запись его в свойства.
      */
     public void saveFrameState(String key, JInternalFrame frame) {
-        properties.setProperty(key + ".x", String.valueOf(frame.getX()));
-        properties.setProperty(key + ".y", String.valueOf(frame.getY()));
-        properties.setProperty(key + ".width", String.valueOf(frame.getWidth()));
-        properties.setProperty(key + ".height", String.valueOf(frame.getHeight()));
+        java.awt.Rectangle bounds;
+        
+        //если это baseinternalframe окно, берет нормальные координаты
+        if (frame instanceof BaseInternalFrame) {
+            bounds = ((BaseInternalFrame) frame).getStoredNormalBounds();
+        } else {
+            bounds = frame.getBounds();
+        }
+
+        properties.setProperty(key + ".x", String.valueOf(bounds.x));
+        properties.setProperty(key + ".y", String.valueOf(bounds.y));
+        properties.setProperty(key + ".width", String.valueOf(bounds.width));
+        properties.setProperty(key + ".height", String.valueOf(bounds.height));
         properties.setProperty(key + ".isIcon", String.valueOf(frame.isIcon()));
         properties.setProperty(key + ".isMaximum", String.valueOf(frame.isMaximum()));
     }
@@ -59,11 +68,17 @@ public class WindowProfileManager {
             frame.setBounds(x, y, width, height);
             
             //восстановление свернутого/развернутого состояния
-            if (isMaximum) {
-                frame.setMaximum(true);
-            } else if (isIcon) {
+
+            if (isIcon) {
                 frame.setIcon(true);
+            } else if (isMaximum) {
+                frame.setMaximum(true);
             }
+            // if (isMaximum) {
+            //     frame.setMaximum(true);
+            // } else if (isIcon) {
+            //     frame.setIcon(true);
+            // }
         } catch (Exception e) {
             Logger.error("Ошибка при восстановлении состояния окна " + key + ": " + e.getMessage());
         }
