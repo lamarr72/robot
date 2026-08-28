@@ -1,240 +1,322 @@
 package gui;
 
-import java.awt.Color;
-import java.awt.EventQueue;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
-import java.awt.Point;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.awt.geom.AffineTransform;
+import java.awt.*;
+import java.awt.event.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
-
-import javax.swing.JPanel;
+import javax.swing.*;
 
 /**
- * Панель (JPanel) для визуализауии игры.
- * Рисует робота - круг и цель - квадрат. 
- * Робот автоматически движется к цели с ограниченой скоростью и угловой скоростью.
- * Использует два таймера: один для обновления модели каждые 10мс, второй для перерисовки каждые 50мс.
- * Обрабатывает клики мыши для установки новой цели.
+ * Панель для визауализации игры
  */
-public class GameVisualizer extends JPanel //панель для визуализации игры
-{
-    private final Timer m_timer = initTimer();
-    
-    private static Timer initTimer() 
-    {
-        Timer timer = new Timer("events generator", true);
-        return timer;
-    }
-    
-    private volatile double m_robotPositionX = 100;
-    private volatile double m_robotPositionY = 100; 
-    private volatile double m_robotDirection = 0; 
+public class GameVisualizer extends JPanel {
 
-    private volatile int m_targetPositionX = 150;
-    private volatile int m_targetPositionY = 100;
-    
-    private static final double maxVelocity = 0.1; 
-    private static final double maxAngularVelocity = 0.005; 
-    
-    public GameVisualizer() 
-    {
-        m_timer.schedule(new TimerTask()
-        {
+    // СОСТОЯНИЯ ИГРЫ
+    //перечисление возможных состояний игры
+    public enum GameState {PLAYING, GAME_OVER}
+
+    //текущее состояние игры
+    private volatile GameState gameState = GameState.PLAYING;
+
+    // КОНСТАНТЫ ДОРОГИ И МАШИН
+    private static final int ROAD_WIDTH = 300;
+    private static final int CAR_WIDTH = 40;
+    private static final int CAR_HEIGHT = 70;
+    private static final double BASE_SPEED = 3.0;
+
+    // ПАРАМЕТРЫ ИГРОКА
+    //смещение игрока по X
+    private volatile int m_playerX = 0;
+
+    //флаги клавиш
+    private volatile boolean movingLeft = false;
+    private volatile boolean movingRight = false;
+
+    //скорость маневрирования игрока (пиксель/тик)
+    private final int playerSpeedX = 5;
+
+    //ПАРАМЕТРЫ ИГРЫ И ОЧКИ
+    // суммарное пройденное расстояние 
+    private volatile double distanceTravalled = 0;
+    //текущий счет 
+    private volatile int score = 0;
+    //текущая скорость мирв
+    private volatile double currentWorldSpeed = BASE_SPEED;
+
+    //смещение для создания эффекта движения преривистой линии разметки на дороге
+    private double roadOffset = 0;
+
+    // ПРЕПЯТСТВИЯ
+    //список активных препятствий на экране
+    private final List<Obstacle> obstacles = new ArrayList<>();
+    //генератор чисел для спавна препятсвий в случаных местах
+    private final Random random = new Random();
+    //таймер для следующего препятсвия 
+    private int spawnTimer = 0;
+
+    //инициализация общего таймера для запуска рендеринга и физики
+    private final Timer m_timer = initTimer();
+
+    //создание демон поток-таймера
+    private static Timer initTimer() {
+        return new Timer("event generator", true);
+    }
+
+    public GameVisualizer() {
+        setupKeyBindings();
+        setDoubleBuffered(true); //двойная буферизация для устранения траблов с отрисовкой
+
+        // ЗАДАЧА РЕНДЕРИНГА
+        //запуск перерисовки 
+        m_timer.schedule(new TimerTask() {
             @Override
-            public void run()
-            {
-                onRedrawEvent();
+            public void run() {
+                EventQueue.invokeLater(GameVisualizer.this::repaint);
             }
-        }, 0, 50);
-        m_timer.schedule(new TimerTask()
-        {
+        }, 0, 30);
+
+        // ЗАДАЧА ОБНОВЛЕНИЯ ФИЗИКИ
+        //запуск расчет координат
+        m_timer.schedule(new TimerTask() {
             @Override
-            public void run()
-            {
+            public void run() {
                 onModelUpdateEvent();
             }
         }, 0, 10);
-        addMouseListener(new MouseAdapter()
-        {
+    }
+
+    /**
+     * Настройка управления
+     */
+    private void setupKeyBindings() {
+        //получение карту ввода для перехватат нажатий клавиш (окно активно)
+        InputMap inputMap = getInputMap(WHEN_IN_FOCUSED_WINDOW);
+        //получение карты действий для связки надатий с конкретным кодом
+        ActionMap actionMap = getActionMap();
+
+        // ОБРАБОТКА ВЛЕВО
+        //привязка события "Нажата клавиша влево" к идентификатору left_down
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_LEFT, 0, false), "left_down");
+        //определение действия
+        actionMap.put("left_down", new AbstractAction() {
             @Override
-            public void mouseClicked(MouseEvent e)
-            {
-                setTargetPosition(e.getPoint());
-                repaint();
+            public void actionPerformed(ActionEvent e) { movingLeft = true; }
+        });
+
+        //привязка события "Отпускание влево" к идентификатору left_up
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_LEFT, 0, true), "left_up");
+        //определение действия
+        actionMap.put("left_up", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) { movingLeft = false; }
+        });
+
+        // ОБРАБОТКА ДВИЖЕНИЯ ВПРАВО
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, 0, false), "right_down");
+        actionMap.put("right_down", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) { movingRight = true; }
+        });
+
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_RIGHT, 0, true), "right_up");
+        actionMap.put("right_up", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) { movingRight = false; }
+        });
+
+        // ОБРАБОТКА ПЕРЕЗАПУСКА
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_SPACE, 0, false), "space_down");
+        actionMap.put("space_down", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (gameState == GameState.GAME_OVER) {
+                    restartGame();
+                }
             }
         });
-        setDoubleBuffered(true);
     }
 
-    protected void setTargetPosition(Point p)
-    {
-        m_targetPositionX = p.x;
-        m_targetPositionY = p.y;
-    }
-    
-    protected void onRedrawEvent()
-    {
-        EventQueue.invokeLater(this::repaint);
+    /**
+     * Сброс всех параметров 
+     */
+    private void restartGame() {
+        m_playerX = 0; 
+        distanceTravalled = 0;
+        score = 0;
+        currentWorldSpeed = BASE_SPEED;
+        obstacles.clear();
+        gameState = GameState.PLAYING;
     }
 
-    private static double distance(double x1, double y1, double x2, double y2)
-    {
-        double diffX = x1 - x2;
-        double diffY = y1 - y2;
-        return Math.sqrt(diffX * diffX + diffY * diffY);
-    }
-    
-    private static double angleTo(double fromX, double fromY, double toX, double toY)
-    {
-        double diffX = toX - fromX;
-        double diffY = toY - fromY;
-        
-        return asNormalizedRadians(Math.atan2(diffY, diffX));
-    }
-    
-    protected void onModelUpdateEvent()
-    {
-        double distance = distance(m_targetPositionX, m_targetPositionY, 
-            m_robotPositionX, m_robotPositionY);
-        if (distance < 0.5)
-        {
+    /**
+     * Метод обновления мат и физ модели игры (каждые 10мс)
+     */
+    protected void onModelUpdateEvent() {
+        if (gameState == GameState.GAME_OVER) {
             return;
         }
-        double velocity = maxVelocity;
-        double angleToTarget = angleTo(m_robotPositionX, m_robotPositionY, m_targetPositionX, m_targetPositionY);
-        double angularVelocity = 0;
-        if (angleToTarget > m_robotDirection)
-        {
-            angularVelocity = maxAngularVelocity;
+
+        // ДВИЖЕНИЕ ИГРОКА
+        if (movingLeft && !movingRight) m_playerX -= playerSpeedX;
+        if (movingRight && !movingLeft) m_playerX += playerSpeedX;
+
+        // ОГРАНИЧЕНИЕ ВЫХОДА ЗА ПРЕДЕЛЫ ДОРОГИ
+        //макс допустимое отклонение от центра
+        int maxLimit = ROAD_WIDTH / 2 - CAR_WIDTH / 2;
+        //если игрок сильно ушел влево/врпаво - возвращение на край
+        if (m_playerX < -maxLimit) m_playerX = -maxLimit;
+        if (m_playerX > maxLimit) m_playerX = maxLimit;
+
+        //НАЧИСЛЕНИЕ ОЧКОВ И УСКОРЕНИЕ
+        //постепенное увеличение скорости (в зависимости от счета)
+        currentWorldSpeed = BASE_SPEED + (score / 500.0);
+        distanceTravalled += currentWorldSpeed;
+        //вычисление счета: каждые 100 дистанции = 1 виртуальный метр = 10 баллов
+        score = (int) (distanceTravalled / 100) * 10;
+
+        //анимация разметки 
+        roadOffset -= currentWorldSpeed;
+        if (roadOffset < 0) roadOffset = 40;
+
+        // ГЕНЕРАЦИЯ ПРЕПЯТСТВИЙ
+        //таймер до след появления --
+        spawnTimer--;
+        if (spawnTimer <= 0) {
+            spawnObstacle(); 
+            //задача времени до след генерации
+            spawnTimer = (int) Math.max(30, 100 - currentWorldSpeed * 5);
         }
-        if (angleToTarget < m_robotDirection)
-        {
-            angularVelocity = -maxAngularVelocity;
-        }
+
+        // ДВИЖЕНИЕ ПРЕПЯТСТВИЙ + ПРОВЕРКА КОЛЛИЗИЙ
+        int playerY = getHeight() - 100;
+
+        //создание хитбокса 
+        Rectangle playerRect = new Rectangle(getWidth() / 2 + m_playerX - CAR_WIDTH / 2, 
+            playerY, CAR_WIDTH, CAR_HEIGHT);
         
-        moveRobot(velocity, angularVelocity, 10);
-    }
-    
-    private static double applyLimits(double value, double min, double max)
-    {
-        if (value < min)
-            return min;
-        if (value > max)
-            return max;
-        return value;
-    }
-    
-    private void moveRobot(double velocity, double angularVelocity, double duration)
-    {
-        velocity = applyLimits(velocity, 0, maxVelocity);
-        angularVelocity = applyLimits(angularVelocity, -maxAngularVelocity, maxAngularVelocity);
-        double newX = m_robotPositionX + velocity / angularVelocity * 
-            (Math.sin(m_robotDirection  + angularVelocity * duration) -
-                Math.sin(m_robotDirection));
-        if (!Double.isFinite(newX))
-        {
-            newX = m_robotPositionX + velocity * duration * Math.cos(m_robotDirection);
-        }
-        double newY = m_robotPositionY - velocity / angularVelocity * 
-            (Math.cos(m_robotDirection  + angularVelocity * duration) -
-                Math.cos(m_robotDirection));
-        if (!Double.isFinite(newY))
-        {
-            newY = m_robotPositionY + velocity * duration * Math.sin(m_robotDirection);
-        }
-        ///испарвление бага убегания 
-        //ограничение Х в пределах от 0 до ширины компонента
-        if (newX < 0) newX = 0;
-        else if (newX > getWidth()) newX = getWidth();
-        //ограничение Y в пределах от 0 до высоты компонента
-        if (newY < 0) newY = 0;
-        else if (newY > getHeight()) newY = getHeight();
+        //итератор для удаления элементов из списка во время цикла
+        Iterator<Obstacle> iterator = obstacles.iterator();
+        while (iterator.hasNext()) {
+            Obstacle obs = iterator.next();
+            obs.y += currentWorldSpeed + obs.speed;
 
-        m_robotPositionX = newX;
-        m_robotPositionY = newY;
-        double newDirection = asNormalizedRadians(m_robotDirection + angularVelocity * duration); 
-        m_robotDirection = newDirection;
+            //уход препятствия за нижний экран
+            if (obs.y > getHeight()) {
+                iterator.remove();
+                continue;
+            }
+            Rectangle obsRect = new Rectangle(getWidth() / 2 + obs.xOffset - CAR_WIDTH / 2,
+                (int) obs.y, CAR_WIDTH, CAR_HEIGHT);
+            
+            //авария
+            if (playerRect.intersects(obsRect)) {
+                gameState = GameState.GAME_OVER;
+            }
+        }
     }
 
-    private static double asNormalizedRadians(double angle)
-    {
-        while (angle < 0)
-        {
-            angle += 2*Math.PI;
-        }
-        while (angle >= 2*Math.PI)
-        {
-            angle -= 2*Math.PI;
-        }
-        return angle;
+    /** 
+     * Создание новгго препятствия в случайной точке дороги
+     */
+    private void spawnObstacle() {
+        Obstacle obs = new Obstacle();
+
+        //вычисление макс возможное отклонение от центра
+        int maxLimit = ROAD_WIDTH / 2 - CAR_WIDTH / 2;
+        //случайное смещение по X (от левой до правой границы)
+        obs.xOffset = random.nextInt(maxLimit * 2) - maxLimit;
+        
+        obs.y = -CAR_HEIGHT;
+        //случайная скорость препятствия
+        obs.speed = random.nextDouble() * 2;
+
+        //добавление препятствия в список на отрисовку
+        obstacles.add(obs);
     }
-    
-    private static int round(double value)
-    {
-        return (int)(value + 0.5);
-    }
-    
+
+    // ОТРИСОВКА
     @Override
-    public void paint(Graphics g)
-    {
-        super.paint(g);
-        Graphics2D g2d = (Graphics2D)g; 
-        drawRobot(g2d, round(m_robotPositionX), round(m_robotPositionY), m_robotDirection);
-        drawTarget(g2d, m_targetPositionX, m_targetPositionY);
-    }
-    
-    private static void fillOval(Graphics g, int centerX, int centerY, int diam1, int diam2)
-    {
-        g.fillOval(centerX - diam1 / 2, centerY - diam2 / 2, diam1, diam2);
-    }
-    
-    private static void drawOval(Graphics g, int centerX, int centerY, int diam1, int diam2)
-    {
-        g.drawOval(centerX - diam1 / 2, centerY - diam2 / 2, diam1, diam2);
-    }
-    
-    private void drawRobot(Graphics2D g, int x, int y, double direction)
-    {
-        int robotCenterX = round(m_robotPositionX); 
-        int robotCenterY = round(m_robotPositionY);
-        AffineTransform t = AffineTransform.getRotateInstance(direction, robotCenterX, robotCenterY); 
-        g.setTransform(t);
-        g.setColor(Color.MAGENTA);
-        fillOval(g, robotCenterX, robotCenterY, 30, 10);
-        g.setColor(Color.BLACK);
-        drawOval(g, robotCenterX, robotCenterY, 30, 10);
-        g.setColor(Color.WHITE);
-        fillOval(g, robotCenterX  + 10, robotCenterY, 5, 5);
-        g.setColor(Color.BLACK);
-        drawOval(g, robotCenterX  + 10, robotCenterY, 5, 5);
-    }
-    
-    private void drawTarget(Graphics2D g, int x, int y)
-    {
-        AffineTransform t = AffineTransform.getRotateInstance(0, 0, 0); 
-        g.setTransform(t);
-        g.setColor(Color.GREEN);
-        fillOval(g, x, y, 5, 5);
-        g.setColor(Color.BLACK);
-        drawOval(g, x, y, 5, 5);
-    }
+    protected void paintComponent(Graphics g) {
+        //вызов род метода для очистки фона
+        super.paintComponent(g);
+        Graphics2D g2d = (Graphics2D) g;
 
-    //для тестов
-    protected void setRobotPositionForTest(double x, double y, double direction) {
-        m_robotPositionX = x;
-        m_robotPositionY = y;
-        m_robotDirection = direction;
+        //получение текущих разеров панели
+        int width = getWidth();
+        int height = getHeight();
+        int centerX = width / 2;
+
+        // ОТРИСОВКА ОБОЧИНЫ
+        g2d.setColor(new Color(34, 139, 34)); 
+        g2d.fillRect(0, 0, width, height);
+
+        // ОТРИСОВКА ДОРОГИ
+        g2d.setColor(Color.DARK_GRAY);
+        int roadLeftX = centerX - ROAD_WIDTH / 2;
+        g2d.fillRect(roadLeftX, 0, ROAD_WIDTH, height);
+
+        // ОТРИСОВКА РАЗМЕТКИ
+        g2d.setColor(Color.WHITE);
+        //настройка кисти
+        g2d.setStroke(new BasicStroke(4, BasicStroke.CAP_BUTT, BasicStroke.JOIN_BEVEL, 0, new float[]{20, 20}, (float) roadOffset));
+        g2d.drawLine(centerX, 0, centerX, height); //рисуется донизу
+
+        //возращение кисти к сплошной линии дл яотрисовки сплошных грыниц дороги
+        g2d.setStroke(new BasicStroke(4));
+        g2d.drawLine(roadLeftX, 0, roadLeftX, height);
+        g2d.drawLine(roadLeftX + ROAD_WIDTH, 0, roadLeftX + ROAD_WIDTH, height);
+
+        //ОТРИСОВКА ПРЕПЯТСТВИЙ
+        g2d.setColor(Color.RED);
+        for (Obstacle obs : obstacles) {
+            g2d.fillRect(centerX + obs.xOffset - CAR_WIDTH / 2, (int) obs.y, CAR_WIDTH, CAR_HEIGHT);
+        }
+
+        //ОТРИСОВКА ИГРОКА
+        int playerY = height - 100;
+        g2d.setColor(Color.CYAN);
+        g2d.fillRect(centerX + m_playerX - CAR_WIDTH / 2, playerY, CAR_WIDTH, CAR_HEIGHT);
+
+        // ОТРИСОВКА ИНТЕРФЕЙСА
+        g2d.setColor(Color.WHITE);
+        g2d.setFont(new Font("Arial", Font.BOLD, 20));
+        g2d.drawString("Score: " + score, 20, 30);
+        g2d.drawString("Speed: " + String.format("%.1f", currentWorldSpeed), 20, 60);
+
+        //GAME OVER
+        if (gameState == GameState.GAME_OVER) {
+            //черный цвет с прозрачностью 150 из 255
+            g2d.setColor(new Color(0, 0, 0, 150)); 
+            //заливка
+            g2d.fillRect(0, 0, width, height);
+
+            //настройка текста "GAME OVER"
+            g2d.setColor(Color.RED);
+            g2d.setFont(new Font("Arial", Font.BOLD, 50));
+            String goText = "GAME OVER";
+            //шширина строки в пикселях для отцентровки
+            int textWidth = g2d.getFontMetrics().stringWidth(goText);
+            g2d.drawString(goText, centerX - textWidth / 2, height / 2);
+
+            //настройка текста подсказки "Press SPACE"
+            g2d.setColor(Color.WHITE);
+            g2d.setFont(new Font("Arial", Font.PLAIN, 20));
+            String restartText = "Press SPACE to Restart";
+            int restWidth = g2d.getFontMetrics().stringWidth(restartText);
+            g2d.drawString(restartText, centerX - restWidth / 2, height / 2 + 40);
+        }
     }
-    
-    protected double getRobotPositionX() {
-        return m_robotPositionX;
-    }
-    
-    protected double getRobotPositionY() {
-        return m_robotPositionY;
-    }
+    /**
+    * Внутренний класс, представляющий препятствие.
+    * Хранит: позицию и индивидуальную скорость.
+    */
+    private class Obstacle {
+            int xOffset;
+            double y;
+            double speed;
+        }
 }
