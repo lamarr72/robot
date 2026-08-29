@@ -6,7 +6,7 @@
 
     <groupId>ru.urfu.men241001</groupId>
     <artifactId>robot_app</artifactId>
-    <version>3.2</version>
+    <version>5.1</version>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source> <maven.compiler.target>17</maven.compiler.target>
