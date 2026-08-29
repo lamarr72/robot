@@ -25,7 +25,7 @@ public class GameVisualizer extends JPanel {
     public enum GameState {PLAYING, GAME_OVER}
 
     //текущее состояние игры
-    private volatile GameState gameState = GameState.PLAYING;
+    volatile GameState gameState = GameState.PLAYING;
 
     // КОНСТАНТЫ ДОРОГИ И МАШИН
     private static final int ROAD_WIDTH = 300;
@@ -35,7 +35,7 @@ public class GameVisualizer extends JPanel {
 
     // ПАРАМЕТРЫ ИГРОКА
     //смещение игрока по X
-    private volatile int m_playerX = 0;
+    volatile int m_playerX = 0;
 
     //флаги клавиш
     private volatile boolean movingLeft = false;
@@ -65,7 +65,7 @@ public class GameVisualizer extends JPanel {
 
     // ПРЕПЯТСТВИЯ
     //список активных препятствий на экране
-    private final List<Obstacle> obstacles = new ArrayList<>();
+    final List<Obstacle> obstacles = new ArrayList<>();
     //генератор чисел для спавна препятсвий в случаных местах
     private final Random random = new Random();
     //таймер для следующего препятсвия 
@@ -382,7 +382,7 @@ public class GameVisualizer extends JPanel {
     * Внутренний класс, представляющий препятствие.
     * Хранит: позицию и индивидуальную скорость.
     */
-    private class Obstacle {
+    public class Obstacle {
             int xOffset;
             double y;
             double speed;
