@@ -4,11 +4,9 @@ import javax.swing.text.AbstractDocument;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.DocumentFilter;
-import javax.swing.text.DocumentFilter.FilterBypass;
 
 import java.awt.*;
 import java.awt.event.*;
-import java.text.AttributedCharacterIterator.Attribute;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -47,12 +45,20 @@ public class GameVisualizer extends JPanel {
     private final int playerSpeedX = 5;
 
     //ПАРАМЕТРЫ ИГРЫ И ОЧКИ
-    // суммарное пройденное расстояние 
+    //суммарное пройденное расстояние 
     private volatile double distanceTravalled = 0;
     //текущий счет 
     private volatile int score = 0;
     //текущая скорость мирв
     private volatile double currentWorldSpeed = BASE_SPEED;
+
+    //ТЕКУЩАЯ СЛОЖНОСТЬ
+    private volatile DifficultyLevel currentDifficulty = DifficultyLevel.NORMAL;
+
+    public void setDifficulty(DifficultyLevel difficulty) {
+        this.currentDifficulty = difficulty;
+        restartGame(); //gерезапуск игры при смене сложности
+    }
 
     //смещение для создания эффекта движения преривистой линии разметки на дороге
     private double roadOffset = 0;
@@ -159,7 +165,7 @@ public class GameVisualizer extends JPanel {
         m_playerX = 0; 
         distanceTravalled = 0;
         score = 0;
-        currentWorldSpeed = BASE_SPEED;
+        currentWorldSpeed = BASE_SPEED * currentDifficulty.getSpeedMultiplier();
         obstacles.clear();
         isGameOverProcessed = false;
         scoreManager.loadScore();
@@ -189,26 +195,25 @@ public class GameVisualizer extends JPanel {
         if (m_playerX < -maxLimit) m_playerX = -maxLimit;
         if (m_playerX > maxLimit) m_playerX = maxLimit;
 
-        //НАЧИСЛЕНИЕ ОЧКОВ И УСКОРЕНИЕ
+        // НАЧИСЛЕНИЕ ОЧКОВ И УСКОРЕНИЕ
         //постепенное увеличение скорости (в зависимости от счета)
-        currentWorldSpeed = BASE_SPEED + (score / 500.0);
+        currentWorldSpeed = (BASE_SPEED * currentDifficulty.getSpeedMultiplier()) + (score / 500.0);
         distanceTravalled += currentWorldSpeed;
-        //вычисление счета: каждые 100 дистанции = 1 виртуальный метр = 10 баллов
-        score = (int) (distanceTravalled / 100) * 10;
+        
+        //очки умножаются на коэффициент сложности
+        score = (int) ((distanceTravalled / 100) * 10 * currentDifficulty.getScoreMultiplier());
 
-        //анимация разметки 
+        // АНИМАЦИЯ РАЗМЕТКИ 
         roadOffset -= currentWorldSpeed;
         if (roadOffset < 0) roadOffset = 40;
 
         // ГЕНЕРАЦИЯ ПРЕПЯТСТВИЙ
-        //таймер до след появления --
         spawnTimer--;
         if (spawnTimer <= 0) {
             spawnObstacle(); 
-            //задача времени до след генерации
-            spawnTimer = (int) Math.max(30, 100 - currentWorldSpeed * 5);
+            //базовый таймер спавна умножаем на коэффициент сложности
+            spawnTimer = (int) (Math.max(30, 100 - currentWorldSpeed * 5) * currentDifficulty.getSpawnRateMultiplier());
         }
-
         // ДВИЖЕНИЕ ПРЕПЯТСТВИЙ + ПРОВЕРКА КОЛЛИЗИЙ
         int playerY = getHeight() - 100;
 
@@ -329,13 +334,13 @@ public class GameVisualizer extends JPanel {
         g2d.drawLine(roadLeftX, 0, roadLeftX, height);
         g2d.drawLine(roadLeftX + ROAD_WIDTH, 0, roadLeftX + ROAD_WIDTH, height);
 
-        //ОТРИСОВКА ПРЕПЯТСТВИЙ
+        // ОТРИСОВКА ПРЕПЯТСТВИЙ
         g2d.setColor(Color.RED);
         for (Obstacle obs : obstacles) {
             g2d.fillRect(centerX + obs.xOffset - CAR_WIDTH / 2, (int) obs.y, CAR_WIDTH, CAR_HEIGHT);
         }
 
-        //ОТРИСОВКА ИГРОКА
+        // ОТРИСОВКА ИГРОКА
         int playerY = height - 100;
         g2d.setColor(Color.CYAN);
         g2d.fillRect(centerX + m_playerX - CAR_WIDTH / 2, playerY, CAR_WIDTH, CAR_HEIGHT);
@@ -345,11 +350,12 @@ public class GameVisualizer extends JPanel {
         g2d.setFont(new Font("Arial", Font.BOLD, 20));
         g2d.drawString("Score: " + score, 20, 30);
         g2d.drawString("Speed: " + String.format("%.1f", currentWorldSpeed), 20, 60);
+        g2d.drawString("Diff: " + currentDifficulty.getDisplayName(), 20, 120);
         //отрисовка текущего рекорда
         g2d.setColor(Color.YELLOW);
         g2d.drawString("Best: " + scoreManager.getBestScore() + " (" + scoreManager.getBestPlayer() + ")", 20, 90);
 
-        //GAME OVER
+        // GAME OVER
         if (gameState == GameState.GAME_OVER) {
             //черный цвет с прозрачностью 150 из 255
             g2d.setColor(new Color(0, 0, 0, 150)); 
@@ -360,7 +366,7 @@ public class GameVisualizer extends JPanel {
             g2d.setColor(Color.RED);
             g2d.setFont(new Font("Arial", Font.BOLD, 50));
             String goText = "GAME OVER";
-            //шширина строки в пикселях для отцентровки
+            //ширина строки в пикселях для отцентровки
             int textWidth = g2d.getFontMetrics().stringWidth(goText);
             g2d.drawString(goText, centerX - textWidth / 2, height / 2);
 
