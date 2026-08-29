@@ -5,18 +5,21 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.util.Properties;
 
-/**
- * Менеджер для сохранения и загрузки локальных рекордов игры. 
- */
 public class ScoreManager {
-    //сохранение файла в домашнюю редикторию пользователя
-    private static final String SCORE_FILE = System.getProperty("user.home") + File.separator + "traffic_racer_scores.properties";
-    
+    private final String scoreFilePath; 
+
     private int bestScore = 0;
     private String bestPlayer = "AAA";
 
+    //основной конструктор для игры
     public ScoreManager() {
-        //загрузка рекорда сразу при создании объекта
+        //вызов второго конструктора, передавая стандартный путь
+        this(System.getProperty("user.home") + File.separator + ".traffic_racer_scores.properties");
+    }
+
+    //конструктор для тестов
+    public ScoreManager(String customFilePath) {
+        this.scoreFilePath = customFilePath;
         loadScore();
     }
 
@@ -24,7 +27,7 @@ public class ScoreManager {
      * Загрузка реконда из файла.
      */
     public void loadScore() {
-        File file = new File(SCORE_FILE);
+        File file = new File(scoreFilePath);
         if (file.exists()) {
             try (FileInputStream fis = new FileInputStream(file)) {
                 Properties props = new Properties();
@@ -45,7 +48,7 @@ public class ScoreManager {
         this.bestPlayer = (player != null && !player.trim().isEmpty()) ? player.trim() : "AAA";
         this.bestScore = score;
 
-        try (FileOutputStream fos = new FileOutputStream(SCORE_FILE)) {
+        try (FileOutputStream fos = new FileOutputStream(scoreFilePath)) {
             Properties props = new Properties();
             props.setProperty("bestScore", String.valueOf(bestScore));
             props.setProperty("bestPlayer", bestPlayer);
