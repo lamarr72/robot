@@ -1,7 +1,14 @@
 package gui;
 
+import javax.swing.text.AbstractDocument;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DocumentFilter;
+import javax.swing.text.DocumentFilter.FilterBypass;
+
 import java.awt.*;
 import java.awt.event.*;
+import java.text.AttributedCharacterIterator.Attribute;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -57,6 +64,11 @@ public class GameVisualizer extends JPanel {
     private final Random random = new Random();
     //таймер для следующего препятсвия 
     private int spawnTimer = 0;
+
+    //экземпляр менеждера рекордов
+    private final ScoreManager scoreManager = new ScoreManager();
+    //флаг единичного вызова окна рекорда
+    private volatile boolean isGameOverProcessed = false;
 
     //инициализация общего таймера для запуска рендеринга и физики
     private final Timer m_timer = initTimer();
@@ -149,6 +161,8 @@ public class GameVisualizer extends JPanel {
         score = 0;
         currentWorldSpeed = BASE_SPEED;
         obstacles.clear();
+        isGameOverProcessed = false;
+        scoreManager.loadScore();
         gameState = GameState.PLAYING;
     }
 
@@ -157,6 +171,10 @@ public class GameVisualizer extends JPanel {
      */
     protected void onModelUpdateEvent() {
         if (gameState == GameState.GAME_OVER) {
+            if (!isGameOverProcessed) {
+                isGameOverProcessed = true;
+                processGameOver();;
+            }
             return;
         }
 
@@ -219,8 +237,49 @@ public class GameVisualizer extends JPanel {
         }
     }
 
+    private void processGameOver() {
+        if (score > scoreManager.getBestScore()) {
+            //передача вызова окна в поток Swing (чтобы не блокировать таймер физики)
+            SwingUtilities.invokeLater(() -> {
+                JTextField nameField = new JTextField(15);
+
+                //фильтр автомат перевода букв в верхний регистр
+                ((AbstractDocument) nameField.getDocument()).setDocumentFilter(new DocumentFilter() {
+                    @Override
+                    public void insertString(FilterBypass fb, int offset, String string, AttributeSet attr) throws BadLocationException {
+                        if (string != null) {
+                           super.insertString(fb, offset, string.toUpperCase(), attr);
+                        }
+                    }
+
+                    @Override
+                    public void replace(FilterBypass fb, int offset, int length, String text, AttributeSet attrs) throws BadLocationException {
+                        if (text != null) {
+                            super.replace(fb, offset, length, text.toUpperCase(), attrs);
+                        }
+                    }
+                });
+                Object[] message = {
+                    "Новый рекорд: " + score + "!\nВведите имя:", nameField
+                }; 
+
+                int option = JOptionPane.showConfirmDialog(
+                    this,
+                    message,
+                    "Новый рекорд",
+                    JOptionPane.OK_CANCEL_OPTION,
+                    JOptionPane.INFORMATION_MESSAGE
+                );
+
+                if (option == JOptionPane.OK_OPTION) {
+                    scoreManager.saveScore(nameField.getText(), score);
+                }
+            });
+        }
+    }
+
     /** 
-     * Создание новгго препятствия в случайной точке дороги
+     * Создание нового препятствия в случайной точке дороги
      */
     private void spawnObstacle() {
         Obstacle obs = new Obstacle();
@@ -286,6 +345,9 @@ public class GameVisualizer extends JPanel {
         g2d.setFont(new Font("Arial", Font.BOLD, 20));
         g2d.drawString("Score: " + score, 20, 30);
         g2d.drawString("Speed: " + String.format("%.1f", currentWorldSpeed), 20, 60);
+        //отрисовка текущего рекорда
+        g2d.setColor(Color.YELLOW);
+        g2d.drawString("Best: " + scoreManager.getBestScore() + " (" + scoreManager.getBestPlayer() + ")", 20, 90);
 
         //GAME OVER
         if (gameState == GameState.GAME_OVER) {
